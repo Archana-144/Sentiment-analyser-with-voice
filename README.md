@@ -27,3 +27,12 @@ Try the live app here: [Your deployed app URL]
 ```bash
 git clone https://github.com/yourusername/emotion-detector.git
 cd emotion-detector
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+
+pip install -r requirements.txt
