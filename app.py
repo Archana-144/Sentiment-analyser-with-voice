@@ -1,53 +1,90 @@
 import streamlit as st
 from transformers import pipeline
 import speech_recognition as sr
+from PIL import Image
+import base64
 
-# Set page config
-st.set_page_config(page_title="Emotion Detector with Voice", layout="centered")
+# Page config
+st.set_page_config(page_title="Emotion Detector", layout="wide")
 
-st.title("😊 Emotion Detector with Voice Input")
+# 🌈 Background (gradient using CSS)
+def add_bg_from_url():
+    st.markdown("""
+        <style>
+        body {
+            background: linear-gradient(to right, #fbc2eb, #a6c1ee);
+            background-attachment: fixed;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+add_bg_from_url()
 
+# Sidebar
+with st.sidebar:
+    st.header("🔍 How to Use")
+    st.markdown("""
+    - Type or **speak** your input.
+    - Click **Analyze Emotion**.
+    - View top 3 emotions with confidence bars & emojis.
+    - Powered by 🤗 Hugging Face model.
+    """)
+    st.markdown("---")
+    st.markdown("Made with ❤️ using Streamlit")
+
+# Title
+st.markdown("<h1 style='text-align: center;'>😊 Emotion Detector</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Type or speak your feelings and see how an AI understands your emotions!</p>", unsafe_allow_html=True)
+
+# Load model
 @st.cache_resource
 def load_model():
-    return pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", return_all_scores=True)
+    return pipeline("text-classification", model="joeddav/distilbert-base-uncased-go-emotions-student", return_all_scores=True)
 
 model = load_model()
 
-# Voice input section
-if st.button("Record Voice"):
+# Voice input function
+def get_voice_input():
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         st.info("Listening... Please speak now.")
-        audio = recognizer.listen(source, phrase_time_limit=5)
-    try:
-        user_input = recognizer.recognize_google(audio)
-        st.success(f"Recognized Text: {user_input}")
-        
-        # Emotion detection
-        results = model(user_input)[0]
-        results = sorted(results, key=lambda x: x['score'], reverse=True)
+        audio = recognizer.listen(source)
+        try:
+            text = recognizer.recognize_google(audio)
+            st.success(f"You said: {text}")
+            return text
+        except sr.UnknownValueError:
+            st.error("Sorry, could not understand your speech.")
+        except sr.RequestError:
+            st.error("Speech recognition service is unavailable.")
+    return ""
 
-        st.success("Detected Emotions:")
-        for res in results[:3]:
-            label = res['label']
-            score = round(res['score'] * 100, 2)
-            st.write(f"**{label}**: {score}%")
-            st.progress(min(int(score), 100))
+# Text input
+user_input = st.text_area("📝 Type your text here:", height=150)
+use_voice = st.button("🎤 Use Voice Input")
 
-    except Exception as e:
-        st.error(f"Could not understand audio: {e}")
+if use_voice:
+    user_input = get_voice_input()
 
-# Also allow manual text input
-user_input = st.text_area("Or type your text here:", height=150)
-if st.button("Analyze Text"):
+# Emotion detection
+if st.button("🔍 Analyze Emotion"):
     if user_input.strip() == "":
-        st.warning("Please enter some text.")
+        st.warning("Please enter or speak some text.")
     else:
-        results = model(user_input)[0]
-        results = sorted(results, key=lambda x: x['score'], reverse=True)
-        st.success("Detected Emotions:")
-        for res in results[:3]:
-            label = res['label']
-            score = round(res['score'] * 100, 2)
-            st.write(f"**{label}**: {score}%")
-            st.progress(min(int(score), 100))
+        with st.spinner("Analyzing..."):
+            results = model(user_input)[0]
+            results = sorted(results, key=lambda x: x['score'], reverse=True)
+            top_emotions = results[:3]
+
+            st.subheader("🎯 Top Emotions Detected:")
+            emoji_map = {
+                "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
+                "surprise": "😲", "love": "❤️", "gratitude": "🙏", "optimism": "🌞",
+                "pride": "🏆", "disapproval": "👎", "nervousness": "😬", "curiosity": "🤔"
+            }
+
+            for item in top_emotions:
+                label = item['label']
+                score = round(item['score'] * 100, 2)
+                emoji = emoji_map.get(label.lower(), "")
+                st.write(f"**{emoji} {label.capitalize()}**: {score}%")
+                st.progress(min(int(score), 100))
